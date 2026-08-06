@@ -5,16 +5,23 @@ import {
   Modal,
   TextInput,
   Alert,
-  SafeAreaView,
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
-  StyleSheet,
+  ImageBackground,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { logout, updateStudentProfile } from "@/lib/auth-helpers";
 import { useAuthStore } from "@/store/authStore";
+
+// Calculate 40% of the screen height
+const HERO_HEIGHT = Dimensions.get("window").height * 0.25;
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -56,171 +63,244 @@ export default function StudentDashboard() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {/* Green Header Navbar */}
-        <View style={styles.headerContainer}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.headerGreeting}>Hello,</Text>
-              <Text style={styles.headerName}>{profile?.full_name || "Student"}</Text>
-              <Text style={styles.headerSubtext}>Welcome to ShelfTrack</Text>
+    <View className="flex-1 bg-slate-50">
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ImageBackground
+          source={{ uri: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=1000&auto=format&fit=crop" }}
+          style={{ minHeight: 230 }}
+          className="rounded-b-[32px] overflow-hidden"
+        >
+        <View className="flex-1 bg-[#164a2d]/80">
+          <SafeAreaView edges={["top"]}>
+            <View className="flex-row items-center justify-center mx-6 pt-28">
+              <TouchableOpacity
+                onPress={() => router.replace("/profile")}
+                className="w-20 h-20 rounded-full overflow-hidden border-2 border-white/40 bg-white/10"
+              >
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                ) : (
+                  <View className="w-full h-full items-center justify-center">
+                    <Ionicons name="person" size={32} color="rgba(255,255,255,0.9)" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              <View className="flex-1 pl-4">
+                <Text className="text-white/70 text-base font-medium">Welcome back,</Text>
+                <Text className="text-white text-2xl font-extrabold mt-1">
+                  {profile?.full_name || "Student"}
+                </Text>
+                <Text className="text-white/90 text-sm font-medium mt-2">
+                  What do you like to do today?
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => router.replace("/profile")} style={styles.profileIconContainer}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.profileImage} />
-              ) : (
-                <Ionicons name="person-circle-outline" size={48} color="rgba(255,255,255,0.9)" />
-              )}
-            </TouchableOpacity>
-          </View>
+          </SafeAreaView>
         </View>
+        </ImageBackground>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsContainer}>
-          <Text style={styles.sectionTitle}>What would you like to do?</Text>
+        {/* Action Buttons - Overlapping Tilted Stack */}
+        <View className="px-6 pt-10 pb-6">
+          <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">
+            Quick Actions
+          </Text>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.push("/scan")} activeOpacity={0.8}>
-            <View style={[styles.iconBox, { backgroundColor: "#f0fdf4" }]}>
-              <Ionicons name="scan-outline" size={28} color="#164a2d" />
+        <View style={{ paddingHorizontal: 4, gap: 12 }}>
+          {/* Card 1: Scan Book QR */}
+          <TouchableOpacity
+            onPress={() => router.push("/scan")}
+            activeOpacity={0.85}
+            className="flex-row items-center justify-between bg-white p-6 rounded-2xl"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-1 pr-4">
+              <Text className="text-xl font-bold text-black">Scan Book QR</Text>
+              <Text className="text-sm text-black/70 mt-1">Borrow or return a book instantly</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>Scan Book</Text>
-              <Text style={styles.actionSubtitle}>Borrow or return a book via QR</Text>
+            <View className="w-14 h-14 rounded-2xl bg-white/15 items-center justify-center">
+              <Ionicons name="scan-outline" size={28} color="black" />
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.replace("/my-books")} activeOpacity={0.8}>
-            <View style={[styles.iconBox, { backgroundColor: "#eff6ff" }]}>
-              <Ionicons name="bookmarks-outline" size={28} color="#1e40af" />
+          {/* Card 2: My Borrowed Books */}
+          <TouchableOpacity
+            onPress={() => router.replace("/my-books")}
+            activeOpacity={0.85}
+            className="flex-row items-center justify-between bg-white p-6 rounded-2xl"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-1 pr-4">
+              <Text className="text-xl font-bold text-black">My Borrowed Books</Text>
+              <Text className="text-sm text-black/70 mt-1">View books you currently have</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>My Borrowed Books</Text>
-              <Text style={styles.actionSubtitle}>View books you currently have</Text>
+            <View className="w-14 h-14 rounded-2xl bg-white/15 items-center justify-center">
+              <Ionicons name="bookmarks-outline" size={28} color="black" />
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => router.replace("/history")} activeOpacity={0.8}>
-            <View style={[styles.iconBox, { backgroundColor: "#fef3c7" }]}>
-              <Ionicons name="time-outline" size={28} color="#92400e" />
+          {/* Card 3: Borrowed History */}
+          <TouchableOpacity
+            onPress={() => router.replace("/history")}
+            activeOpacity={0.85}
+            className="flex-row items-center justify-between bg-white p-6 rounded-2xl"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-1 pr-4">
+              <Text className="text-xl font-bold text-black">Borrowed History</Text>
+              <Text className="text-sm text-black/70 mt-1">View your past transactions</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.actionTitle}>Borrowed History</Text>
-              <Text style={styles.actionSubtitle}>View your past transactions</Text>
+            <View className="w-14 h-14 rounded-2xl bg-white/15 items-center justify-center">
+              <Ionicons name="time-outline" size={28} color="black" />
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
           </TouchableOpacity>
+
+          {/* Card 4: My Profile */}
+          <TouchableOpacity
+            onPress={() => router.replace("/profile")}
+            activeOpacity={0.85}
+            className="flex-row items-center justify-between bg-white p-6 rounded-2xl"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-1 pr-4">
+              <Text className="text-xl font-bold text-black">My Profile</Text>
+              <Text className="text-sm text-black/70 mt-1">View your profile information</Text>
+            </View>
+            <View className="w-14 h-14 rounded-2xl bg-white/15 items-center justify-center">
+              <Ionicons name="person" size={28} color="black" />
+            </View>
+          </TouchableOpacity>
+        </View>
         </View>
       </ScrollView>
 
-      {/* ONBOARDING MODAL (Hidden behind main UI if triggered) */}
+      {/* ONBOARDING MODAL (Bottom Sheet Style) */}
       <Modal visible={showOnboarding} animationType="slide" transparent={true} onRequestClose={() => {}}>
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.content}>
-            <Text style={modalStyles.mainTitle}>Complete Your Profile</Text>
-            <Text style={modalStyles.subTitle}>Please fill this out so the librarian can identify your borrowed books.</Text>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <View style={modalStyles.inputGroup}>
-                <Text style={modalStyles.label}>First Name <Text style={{color:'red'}}>*</Text></Text>
-                <TextInput style={modalStyles.input} placeholder="e.g. Juan" value={firstName} onChangeText={setFirstName} />
-              </View>
-              <View style={modalStyles.inputGroup}>
-                <Text style={modalStyles.label}>Middle Name</Text>
-                <TextInput style={modalStyles.input} placeholder="e.g. Santos" value={middleName} onChangeText={setMiddleName} />
-              </View>
-              <View style={modalStyles.inputGroup}>
-                <Text style={modalStyles.label}>Last Name <Text style={{color:'red'}}>*</Text></Text>
-                <TextInput style={modalStyles.input} placeholder="e.g. Dela Cruz" value={lastName} onChangeText={setLastName} />
-              </View>
-              <View style={{ flexDirection: 'row', gap: 16 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={modalStyles.label}>Grade Level <Text style={{color:'red'}}>*</Text></Text>
-                  <TextInput style={modalStyles.input} placeholder="e.g. 10" value={gradeLevel} onChangeText={setGradeLevel} keyboardType="numeric" />
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 justify-end bg-black/60"
+        >
+          <View className="bg-white rounded-t-[32px] shadow-2xl max-h-[90%]">
+            {/* Drag Handle & Header */}
+            <View className="pt-3 pb-2 items-center">
+              <View className="w-10 h-1.5 bg-slate-200 rounded-full" />
+            </View>
+            
+            <View className="flex-row items-center justify-between px-6 py-4 border-b border-slate-100">
+              <Text className="text-xl font-bold text-slate-900">Complete Your Profile</Text>
+            </View>
+
+            <ScrollView 
+              className="px-6 py-5" 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text className="text-sm text-slate-500 mb-6">
+                Please fill this out so the librarian can identify your borrowed books.
+              </Text>
+
+              <View className="space-y-4">
+                <View>
+                  <Text className="mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">First Name *</Text>
+                  <TextInput
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-slate-900"
+                    placeholder="e.g. Juan"
+                    placeholderTextColor="#94a3b8"
+                    value={firstName}
+                    onChangeText={setFirstName}
+                  />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={modalStyles.label}>Section</Text>
-                  <TextInput style={modalStyles.input} placeholder="e.g. A" value={section} onChangeText={setSection} autoCapitalize="characters" />
+
+                <View>
+                  <Text className="mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Middle Name</Text>
+                  <TextInput
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-slate-900"
+                    placeholder="e.g. Santos"
+                    placeholderTextColor="#94a3b8"
+                    value={middleName}
+                    onChangeText={setMiddleName}
+                  />
+                </View>
+
+                <View>
+                  <Text className="mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Last Name *</Text>
+                  <TextInput
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-slate-900"
+                    placeholder="e.g. Dela Cruz"
+                    placeholderTextColor="#94a3b8"
+                    value={lastName}
+                    onChangeText={setLastName}
+                  />
+                </View>
+
+                <View className="flex-row gap-4">
+                  <View className="flex-1">
+                    <Text className="mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Grade Level *</Text>
+                    <TextInput
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-slate-900"
+                      placeholder="e.g. 10"
+                      placeholderTextColor="#94a3b8"
+                      value={gradeLevel}
+                      onChangeText={setGradeLevel}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="mb-1.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Section</Text>
+                    <TextInput
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-slate-900"
+                      placeholder="e.g. A"
+                      placeholderTextColor="#94a3b8"
+                      value={section}
+                      onChangeText={setSection}
+                      autoCapitalize="characters"
+                    />
+                  </View>
                 </View>
               </View>
+
+              <TouchableOpacity 
+                onPress={handleSaveProfile} 
+                disabled={isSaving} 
+                className="mt-8 w-full rounded-xl py-4 shadow-md mb-8 flex-row justify-center items-center bg-[#164a2d]"
+                style={{ opacity: isSaving ? 0.7 : 1 }}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={20} color="white" />
+                    <Text className="ml-2 font-bold text-white text-base">Save and Continue</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </ScrollView>
-            <TouchableOpacity onPress={handleSaveProfile} disabled={isSaving} style={modalStyles.submitButton}>
-              {isSaving ? <ActivityIndicator size="small" color="white" /> : <Text style={modalStyles.submitButtonText}>Save and Continue</Text>}
-            </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
-}
-
-// Need to add Image to imports if using avatars
-import { Image } from "react-native";
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#f9fafb" },
-  headerContainer: {
-    backgroundColor: "#164a2d",
-    paddingTop: 20,
-    paddingBottom: 30,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 24,
-    shadowColor: "#164a2d",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  headerGreeting: { color: "rgba(255,255,255,0.7)", fontSize: 14 },
-  headerName: { color: "white", fontSize: 24, fontWeight: "800", marginTop: 2 },
-  headerSubtext: { color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 4 },
-  profileIconContainer: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
-    overflow: 'hidden',
-    borderWidth: 2, 
-    borderColor: "rgba(255,255,255,0.3)" 
-  },
-  profileImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  actionsContainer: { paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 16 },
-  actionCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#f3f4f6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  iconBox: { width: 50, height: 50, borderRadius: 12, justifyContent: "center", alignItems: "center", marginRight: 16 },
-  actionTitle: { fontSize: 16, fontWeight: "600", color: "#111827" },
-  actionSubtitle: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-});
-
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  content: { backgroundColor: "#ffffff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, minHeight: "85%" },
-  mainTitle: { fontSize: 24, fontWeight: "800", color: "#111827", marginBottom: 6 },
-  subTitle: { fontSize: 14, color: "#6b7280", marginBottom: 24 },
-  inputGroup: { marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: "500", color: "#374151", marginBottom: 6 },
-  input: { backgroundColor: "#f9fafb", borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: "#111827" },
-  submitButton: { width: "100%", backgroundColor: "#164a2d", paddingVertical: 16, borderRadius: 12, alignItems: "center", marginTop: 20 },
-  submitButtonText: { color: "#ffffff", fontWeight: "700", fontSize: 18 },
-});
+} 

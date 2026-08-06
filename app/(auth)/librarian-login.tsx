@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from "react-native";
 import { router } from "expo-router";
 import { loginLibrarian, needsPasswordChange } from "@/lib/auth-helpers";
+import { registerForPushNotificationsAsync } from "@/lib/push-notifications";
 
 export default function LibrarianLogin() {
   const [username, setUsername] = useState("");
@@ -17,6 +18,9 @@ export default function LibrarianLogin() {
       if (await needsPasswordChange()) {
         router.replace("/change-password");
       } else {
+        // Fire-and-forget: don't block navigation on the permission
+        // prompt / token round-trip.
+        registerForPushNotificationsAsync();
         router.replace("/(librarian)");
       }
     } catch (err: any) {

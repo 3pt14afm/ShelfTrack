@@ -15,6 +15,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/store/authStore";
+import { useRouter } from "expo-router";
 
 // --- Viewfinder Dimensions ---
 const WINDOW_WIDTH = Dimensions.get("window").width;
@@ -25,12 +26,11 @@ const TOP_MARGIN = WINDOW_HEIGHT * 0.2;
 const BOTTOM_MARGIN = WINDOW_HEIGHT - TOP_MARGIN - SQUARE_SIZE;
 
 // --- Types ---
-type ScreenState = "menu" | "camera" | "confirm";
-type ActionType = "borrow" | "return";
+type ScreenState = "camera" | "confirm";
 
 interface Book {
-  id: string; 
-  book_id: string; 
+  id: string;
+  book_id: string;
   title: string;
   author: string;
   cover_image_url: string | null;
@@ -40,10 +40,10 @@ interface Book {
 export default function ScanScreen() {
   const profile = useAuthStore((s) => s.profile);
   const session = useAuthStore((s) => s.session);
+  const router = useRouter();
 
   // UI State
-  const [screen, setScreen] = useState<ScreenState>("menu");
-  const [action, setAction] = useState<ActionType>("borrow");
+  const [screen, setScreen] = useState<ScreenState>("camera");
   const [scannedBookId, setScannedBookId] = useState<string | null>(null);
 
   // Data State
@@ -71,7 +71,8 @@ export default function ScanScreen() {
   useEffect(() => {
     if (screen === "confirm" && scannedBookId) {
       fetchBookDetails();
-    } else {
+    } else if (screen === "camera") {
+      // Reset state when going back to camera
       setBook(null);
       setScannedBookId(null);
       setIsScanning(false);
@@ -92,7 +93,7 @@ export default function ScanScreen() {
       setBook(data);
     } catch (err: any) {
       Alert.alert("Error", err.message || "Could not find a book with this QR code.", [
-        { text: "OK", onPress: () => setScreen("menu") },
+        { text: "OK", onPress: () => setScreen("camera") },
       ]);
     } finally {
       setLoadingBook(false);
@@ -104,137 +105,56 @@ export default function ScanScreen() {
     setProcessingTx(true);
 
     try {
-      if (action === "borrow") {
-        if (book.available_copies <= 0) {
-          throw new Error("This book has no available copies to borrow.");
-        }
-
-        // Check if student already borrowed this book
-        const { data: existingTx, error: checkError } = await supabase
-          .from("transactions")
-          .select("id")
-          .eq("student_id", session.user.id)
-          .eq("book_id", book.id)
-          .eq("status", "borrowed")
-          .maybeSingle();
-
-        if (checkError) throw checkError;
-        
-        if (existingTx) {
-          throw new Error("You have already borrowed this book and haven't returned it yet.");
-        }
-
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 14);
-
-        const { error: txError } = await supabase.from("transactions").insert({
-          book_id: book.id,
-          student_id: session.user.id,
-          status: "borrowed",
-          borrowed_at: new Date().toISOString(),
-          due_date: dueDate.toISOString(),
-        });
-
-        if (txError) throw txError;
-
-        const { error: updateError } = await supabase
-          .from("books")
-          .update({ available_copies: book.available_copies - 1 })
-          .eq("id", book.id);
-
-        if (updateError) throw updateError;
-
-        Alert.alert(
-          "Success!",
-          `You have borrowed "${book.title}".\nDue date: ${dueDate.toLocaleDateString()}`,
-          [{ text: "Done", onPress: () => setScreen("menu") }]
-        );
-
-      } else if (action === "return") {
-        const { data: txData, error: txError } = await supabase
-          .from("transactions")
-          .update({ status: "returned", returned_at: new Date().toISOString() })
-          .eq("student_id", session.user.id)
-          .eq("book_id", book.id)
-          .eq("status", "borrowed")
-          .select("id")
-          .single();
-
-        if (txError || !txData) {
-          throw new Error("No active borrow record found for this book under your account.");
-        }
-
-        const { error: updateError } = await supabase
-          .from("books")
-          .update({ available_copies: book.available_copies + 1 })
-          .eq("id", book.id);
-
-        if (updateError) throw updateError;
-
-        Alert.alert("Success!", `You have returned "${book.title}".`, [
-          { text: "Done", onPress: () => setScreen("menu") },
-        ]);
+      if (book.available_copies <= 0) {
+        throw new Error("This book has no available copies to borrow.");
       }
+
+      // Check if student already borrowed this book
+      const { data: existingTx, error: checkError } = await supabase
+        .from("transactions")
+        .select("id")
+        .eq("student_id", session.user.id)
+        .eq("book_id", book.id)
+        .eq("status", "borrowed")
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingTx) {
+        throw new Error("You have already borrowed this book and haven't returned it yet.");
+      }
+
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 14);
+
+      const { error: txError } = await supabase.from("transactions").insert({
+        book_id: book.id,
+        student_id: session.user.id,
+        status: "borrowed",
+        borrowed_at: new Date().toISOString(),
+        due_date: dueDate.toISOString(),
+      });
+
+      if (txError) throw txError;
+
+      const { error: updateError } = await supabase
+        .from("books")
+        .update({ available_copies: book.available_copies - 1 })
+        .eq("id", book.id);
+
+      if (updateError) throw updateError;
+
+      Alert.alert(
+        "Success!",
+        `You have borrowed "${book.title}".\nDue date: ${dueDate.toLocaleDateString()}`,
+        [{ text: "Done", onPress: () => router.back() }]
+      );
     } catch (err: any) {
       Alert.alert("Transaction Failed", err.message);
     } finally {
       setProcessingTx(false);
     }
   };
-
-  // -------------------------
-  // RENDER: MENU SCREEN (Fixed for iOS)
-  // -------------------------
-  if (screen === "menu") {
-    return (
-      <SafeAreaView style={menuStyles.safeArea}>
-        <View style={menuStyles.headerContainer}>
-          <Text style={menuStyles.mainTitle}>Scan a Book</Text>
-          <Text style={menuStyles.subTitle}>Choose an action to start scanning.</Text>
-        </View>
-
-        <View style={menuStyles.buttonContainer}>
-          {/* Borrow Button */}
-          <TouchableOpacity
-            onPress={() => {
-              setAction("borrow");
-              setScreen("camera");
-            }}
-            activeOpacity={0.85}
-            style={menuStyles.borrowButton}
-          >
-            <View style={menuStyles.iconBoxPrimary}>
-              <Ionicons name="add-circle-outline" size={28} color="white" />
-            </View>
-            <View style={menuStyles.textContainer}>
-              <Text style={menuStyles.buttonTitlePrimary}>Borrow Book</Text>
-              <Text style={menuStyles.buttonSubtitlePrimary}>Scan QR to borrow a book</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
-
-          {/* Return Button */}
-          <TouchableOpacity
-            onPress={() => {
-              setAction("return");
-              setScreen("camera");
-            }}
-            activeOpacity={0.85}
-            style={menuStyles.returnButton}
-          >
-            <View style={menuStyles.iconBoxSecondary}>
-              <Ionicons name="return-down-back-outline" size={28} color="#164a2d" />
-            </View>
-            <View style={menuStyles.textContainer}>
-              <Text style={menuStyles.buttonTitleSecondary}>Return Book</Text>
-              <Text style={menuStyles.buttonSubtitleSecondary}>Scan QR to return a book</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={24} color="rgba(0,0,0,0.3)" />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   // -------------------------
   // RENDER: CAMERA SCREEN
@@ -256,7 +176,7 @@ export default function ScanScreen() {
           <Text style={styles.errorText}>
             Please enable camera permissions in your settings to scan books.
           </Text>
-          <TouchableOpacity onPress={() => setScreen("menu")} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -286,7 +206,7 @@ export default function ScanScreen() {
 
         <View style={{ position: "absolute", top: 60, left: 0, right: 0, alignItems: "center" }}>
           <Text style={{ color: "white", fontSize: 18, fontWeight: "700" }}>
-            Scan {action === "borrow" ? "Book to Borrow" : "Book to Return"}
+            Scan Book to Borrow
           </Text>
         </View>
 
@@ -294,7 +214,10 @@ export default function ScanScreen() {
           <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, marginBottom: 20 }}>
             Fit the QR code inside the square
           </Text>
-          <TouchableOpacity onPress={() => setScreen("menu")} style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999 }}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999 }}
+          >
             <Text style={{ color: "white", fontWeight: "600" }}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -317,21 +240,21 @@ export default function ScanScreen() {
 
     if (!book) return null;
 
-    const isUnavailable = action === "borrow" && book.available_copies <= 0;
+    const isUnavailable = book.available_copies <= 0;
 
     return (
       <SafeAreaView style={confirmStyles.safeArea}>
-        <ScrollView 
-          style={confirmStyles.scrollView} 
+        <ScrollView
+          style={confirmStyles.scrollView}
           contentContainerStyle={confirmStyles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
           <View style={confirmStyles.headerRow}>
-            <TouchableOpacity onPress={() => setScreen("menu")}>
+            <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="arrow-back" size={24} color="#111827" />
             </TouchableOpacity>
             <Text style={confirmStyles.headerTitle}>
-              {action === "borrow" ? "Confirm Borrow" : "Confirm Return"}
+              Confirm Borrow
             </Text>
             <View style={{ width: 24 }} />
           </View>
@@ -381,13 +304,13 @@ export default function ScanScreen() {
               <ActivityIndicator size="small" color="white" />
             ) : (
               <>
-                <Ionicons 
-                  name={action === "borrow" ? "checkmark-circle-outline" : "return-down-back-outline"} 
-                  size={20} 
-                  color={isUnavailable ? "#9ca3af" : "white"} 
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color={isUnavailable ? "#9ca3af" : "white"}
                 />
                 <Text style={[confirmStyles.actionButtonText, isUnavailable && confirmStyles.actionButtonTextDisabled]}>
-                  {isUnavailable ? "Unavailable" : `Confirm ${action === "borrow" ? "Borrow" : "Return"}`}
+                  {isUnavailable ? "Unavailable" : "Confirm Borrow"}
                 </Text>
               </>
             )}
@@ -399,106 +322,6 @@ export default function ScanScreen() {
 
   return null;
 }
-
-// --- iOS Friendly Menu Button Styles ---
-const menuStyles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#f9fafb",
-  },
-  headerContainer: {
-    paddingHorizontal: 24,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  mainTitle: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#111827",
-    letterSpacing: -0.5,
-  },
-  subTitle: {
-    fontSize: 16,
-    color: "#6b7280",
-    marginTop: 6,
-  },
-  buttonContainer: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: "center",
-    gap: 16,
-  },
-  borrowButton: {
-    backgroundColor: "#164a2d",
-    borderRadius: 20,
-    padding: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    // Proper iOS Shadow
-    shadowColor: "#164a2d",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8, 
-  },
-  returnButton: {
-    backgroundColor: "#ffffff",
-    borderWidth: 2,
-    borderColor: "#164a2d",
-    borderRadius: 20,
-    padding: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    // Subtle iOS Shadow for white cards
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2, 
-  },
-  iconBoxPrimary: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 20,
-  },
-  iconBoxSecondary: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: "#f0fdf4", // Very light green background
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 20,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  buttonTitlePrimary: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
-  buttonSubtitlePrimary: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.7)",
-    marginTop: 4,
-  },
-  buttonTitleSecondary: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#164a2d",
-  },
-  buttonSubtitleSecondary: {
-    fontSize: 14,
-    color: "#6b7280",
-    marginTop: 4,
-  },
-});
-
 
 // --- Styles for Camera Viewfinder ---
 const styles = StyleSheet.create({

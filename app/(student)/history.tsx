@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, ActivityIndicator, Image, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuthStore } from "@/store/authStore";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckCircle2, Clock3, ListFilter, Search, X } from "lucide-react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  ImageBackground,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Transaction {
   id: string;
@@ -19,12 +32,60 @@ interface Transaction {
   };
 }
 
+const colors = {
+  bgBase: "#EEF1F7",
+  bgBaseAlt: "#E6EBF5",
+  glassStrong: "rgba(255,255,255,0.82)",
+  glassBorder: "rgba(255,255,255,0.7)",
+  primary: "#164a2d",
+  primaryDark: "#0d2e1c",
+  success: "#166534",
+  successGlass: "rgba(22,101,52,0.10)",
+  successBorder: "rgba(22,101,52,0.22)",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+  textPrimary: "#1C1A16",
+  shadowDark: "#AEB8CC",
+  white: "#ffffff",
+};
+
+function GlassSurface({ style, children }: { style?: any; children?: React.ReactNode }) {
+  return (
+    <View style={[style, { backgroundColor: colors.glassStrong, overflow: "hidden" }]}>
+      <LinearGradient
+        colors={["rgba(255,255,255,0.55)", "rgba(255,255,255,0)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.7 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      {children}
+    </View>
+  );
+}
+
+type StatusFilter = "all" | "active" | "returned";
+type SortOrder = "none" | "asc" | "desc";
+
+const FILTERS: { key: StatusFilter; label: string; icon: React.ReactNode }[] = [
+  { key: "all", label: "All", icon: <ListFilter size={13} /> },
+  { key: "active", label: "Active", icon: <Clock3 size={13} /> },
+  { key: "returned", label: "Returned", icon: <CheckCircle2 size={13} /> },
+];
+
 export default function HistoryScreen() {
   const router = useRouter();
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Search / filter / sort toolbar state
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("none");
+
+  const SortIcon = sortOrder === "asc" ? ArrowUp : sortOrder === "desc" ? ArrowDown : ArrowUpDown;
 
   useEffect(() => {
     fetchHistory();
@@ -38,6 +99,7 @@ export default function HistoryScreen() {
         .select(`id, borrowed_at, due_date, returned_at, status, books ( title, author, cover_image_url, book_id )`)
         .eq("student_id", session.user.id)
         .order("borrowed_at", { ascending: false });
+
       if (error) throw error;
       setTransactions(data || []);
     } catch (err) {
@@ -48,111 +110,296 @@ export default function HistoryScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
+
+  // Cycle: all -> active -> returned -> all
+  const cycleStatusFilter = () => {
+    setStatusFilter((prev) =>
+      prev === "all" ? "active" : prev === "active" ? "returned" : "all"
+    );
+  };
+
+  // Cycle: none -> asc -> desc -> none
+  const cycleSortOrder = () => {
+    setSortOrder((prev) => (prev === "none" ? "asc" : prev === "asc" ? "desc" : "none"));
+  };
+
+  const displayedTransactions = useMemo(() => {
+    let result = [...transactions];
+
+    if (statusFilter !== "all") {
+      result = result.filter((t) =>
+        statusFilter === "returned" ? t.status === "returned" : t.status !== "returned"
+      );
+    }
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter((t) => t.books?.title?.toLowerCase().includes(q));
+    }
+
+    if (sortOrder !== "none") {
+      result.sort((a, b) => {
+        const diff = new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        return sortOrder === "asc" ? diff : -diff;
+      });
+    }
+
+    return result;
+  }, [transactions, statusFilter, search, sortOrder]);
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
         <ActivityIndicator size="large" color="#164a2d" />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* EXACT SAME GREEN HEADER AS HOME */}
-      <View style={styles.headerContainer}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Borrowed History</Text>
-          <TouchableOpacity onPress={() => router.replace("/profile")} style={styles.profileIconContainer}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.profileImage} />
-            ) : (
-              <Ionicons name="person-circle-outline" size={48} color="rgba(255,255,255,0.9)" />
-            )}
-          </TouchableOpacity>
+    <View className="flex-1 bg-slate-50">
+      {/* SAME IMAGE BACKGROUND HERO AS HOME */}
+      <ImageBackground
+        source={{ uri: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?q=80&w=1000&auto=format&fit=crop" }}
+        style={{ minHeight: 120 }}
+        className="rounded-b-[32px] overflow-hidden"
+      >
+        <View className="flex-1 bg-[#164a2d]/80">
+          <SafeAreaView edges={["top"]}>
+            <View className="flex-row justify-between items-center px-6 pt-3 pb-6">
+              <View>
+                <Text className="text-white text-2xl font-extrabold">History</Text>
+                <Text className="text-white/70 text-sm font-medium mt-1">
+                  Your complete borrowing timeline
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => router.replace("/profile")}
+                className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/30 bg-white/10"
+              >
+                {profile?.avatar_url ? (
+                  <Image source={{ uri: profile.avatar_url }} className="w-full h-full" resizeMode="cover" />
+                ) : (
+                  <View className="w-full h-full items-center justify-center">
+                    <Ionicons name="person" size={24} color="rgba(255,255,255,0.9)" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
         </View>
+      </ImageBackground>
+
+      {/* TOOLBAR: search / filter / sort, top right */}
+      <View style={styles.toolbarWrap}>
+        <GlassSurface style={styles.toolbarCard}>
+          <View style={styles.searchBar}>
+            <Search size={14} color={colors.textMuted} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by book title"
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <View style={styles.searchClear}>
+                  <X size={12} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.filterRow}>
+            <View style={styles.filterPills}>
+              {FILTERS.map((f) => {
+                const active = statusFilter === f.key;
+                return (
+                  <TouchableOpacity
+                    key={f.key}
+                    onPress={() => setStatusFilter(f.key)}
+                    activeOpacity={0.85}
+                    style={[styles.filterPill, active && styles.filterPillActive]}
+                  >
+                    {React.cloneElement(f.icon as React.ReactElement, {
+                      color: active ? colors.white : colors.textSecondary,
+                    })}
+                    <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              onPress={cycleSortOrder}
+              activeOpacity={0.85}
+              style={[styles.sortButton, sortOrder !== "none" && styles.sortButtonActive]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <SortIcon size={13} color={sortOrder !== "none" ? colors.white : colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </GlassSurface>
       </View>
 
       <FlatList
-        data={transactions}
-        style={{ flex: 1 }}
+        data={displayedTransactions}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        className="flex-1"
+        contentContainerClassName="p-5 pt-4"
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="time-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyText}>No borrowing history yet</Text>
+          <View className="flex-1 items-center justify-center mt-24">
+            <View className="bg-slate-100 p-6 rounded-full mb-5">
+              <Ionicons name="time-outline" size={48} color="#94a3b8" />
+            </View>
+            <Text className="text-lg font-bold text-slate-800">
+              {transactions.length === 0 ? "No History Yet" : "No Matches Found"}
+            </Text>
+            <Text className="text-sm text-slate-500 mt-2 text-center max-w-xs">
+              {transactions.length === 0
+                ? "Your borrowing and return history will show up here."
+                : "Try a different search term or filter."}
+            </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            {item.books?.cover_image_url ? (
-              <Image source={{ uri: item.books.cover_image_url }} style={styles.cover} />
-            ) : (
-              <View style={styles.coverPlaceholder}>
-                <Ionicons name="book-outline" size={20} color="#9ca3af" />
+        renderItem={({ item }) => {
+          const isReturned = item.status === "returned";
+
+          return (
+            <View className="flex-row items-start bg-white rounded-2xl p-3 border border-slate-200 shadow-sm mb-3">
+              {/* Book Cover */}
+              {item.books?.cover_image_url ? (
+                <Image
+                  source={{ uri: item.books.cover_image_url }}
+                  className="h-24 w-16 rounded-lg bg-slate-200"
+                  resizeMode="cover"
+                />
+              ) : (
+                <View className="h-24 w-16 rounded-lg bg-slate-100 items-center justify-center">
+                  <Ionicons name="book-outline" size={24} color="#cbd5e1" />
+                </View>
+              )}
+
+              {/* Book Info */}
+              <View className="flex-1 pl-3 pr-2">
+                <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
+                  {item.books?.title || "Unknown Book"}
+                </Text>
+                <Text className="text-xs text-slate-500 mt-0.5" numberOfLines={1}>
+                  {item.books?.author || "Unknown Author"}
+                </Text>
+
+                {/* Date Stack */}
+                <View className="mt-2 space-y-1.5">
+                  <View className="flex-row items-center">
+                    <Ionicons name="calendar-outline" size={12} color="#94a3b8" />
+                    <Text className="text-[11px] text-slate-500 ml-1.5">
+                      Borrowed: {formatDate(item.borrowed_at)}
+                    </Text>
+                  </View>
+
+                  {isReturned && item.returned_at ? (
+                    <View className="flex-row items-center">
+                      <Ionicons name="checkmark-done-outline" size={12} color="#10b981" />
+                      <Text className="text-[11px] text-emerald-600 font-medium ml-1.5">
+                        Returned: {formatDate(item.returned_at)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="flex-row items-center">
+                      <Ionicons name="time-outline" size={12} color="#f59e0b" />
+                      <Text className="text-[11px] text-amber-600 font-medium ml-1.5">
+                        Due: {formatDate(item.due_date)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            )}
-            <View style={styles.infoContainer}>
-              <Text style={styles.title} numberOfLines={1}>{item.books?.title || "Unknown Book"}</Text>
-              <Text style={styles.author}>{item.books?.author || "Unknown Author"}</Text>
-              <Text style={styles.date}>Borrowed: {formatDate(item.borrowed_at)}</Text>
+
+              {/* Status Badge — normal flow, own column, so it never overlaps the title */}
+              <View
+                className={`px-2.5 py-1 rounded-full border shrink-0 ${isReturned ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"
+                  }`}
+              >
+                <Text
+                  className={`text-[10px] font-bold uppercase tracking-wider ${isReturned ? "text-emerald-700" : "text-amber-700"
+                    }`}
+                >
+                  {isReturned ? "Returned" : "Active"}
+                </Text>
+              </View>
             </View>
-            <View style={[styles.statusBadge, item.status === "borrowed" ? styles.statusBorrowed : styles.statusReturned]}>
-              <Text style={styles.statusText}>{item.status === "borrowed" ? "Active" : "Returned"}</Text>
-            </View>
-          </View>
-        )}
+          );
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  centerContainer: { flex: 1, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
-  
-  // --- EXACT GREEN HEADER STYLES ---
-  headerContainer: {
-    backgroundColor: "#164a2d",
-    paddingTop: 20, // Safe area spacing
-    paddingBottom: 24,
-    marginBottom: 8,
-    shadowColor: "#164a2d",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-    
+  toolbarWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
+  toolbarCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 14,
+    shadowColor: colors.shadowDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  headerContent: {
+  searchBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 24,
+    backgroundColor: colors.bgBase,
+    borderWidth: 1,
+    borderColor: colors.bgBaseAlt,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 37,
+    gap: 8,
   },
-  headerTitle: { color: "white", fontSize: 24, fontWeight: "800" },
-  profileIconContainer: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
-  profileImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-
-  // --- LIST STYLES ---
-  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 100 },
-  emptyText: { color: "#9ca3af", marginTop: 16, fontSize: 16 },
-  card: {
-    backgroundColor: "white", flexDirection: "row", alignItems: "center",
-    padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#f3f4f6",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.02, shadowRadius: 2, elevation: 2,
+  searchInput: { flex: 1, fontSize: 12, color: colors.textPrimary },
+  searchClear: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    alignItems: "center", justifyContent: "center",
   },
-  cover: { width: 50, height: 70, borderRadius: 6, backgroundColor: "#e5e7eb", marginRight: 12 },
-  coverPlaceholder: { width: 50, height: 70, borderRadius: 6, backgroundColor: "#f3f4f6", marginRight: 12, justifyContent: "center", alignItems: "center" },
-  infoContainer: { flex: 1, justifyContent: "center" },
-  title: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  author: { fontSize: 12, color: "#6b7280", marginTop: 2 },
-  date: { fontSize: 11, color: "#9ca3af", marginTop: 4 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  statusBorrowed: { backgroundColor: "#fef3c7" },
-  statusReturned: { backgroundColor: "#f0fdf4" },
-  statusText: { fontSize: 11, fontWeight: "600" },
+  filterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
+  filterPills: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  filterPill: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderWidth: 1, borderColor: colors.successGlass,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
+  },
+  filterPillActive: {
+    backgroundColor: colors.primary, borderColor: colors.primary,
+    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22, shadowRadius: 5, elevation: 2,
+  },
+  filterPillText: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
+  filterPillTextActive: { color: colors.white },
+  sortButton: {
+    width: 27, height: 27, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderWidth: 1, borderColor: colors.successGlass,
+  },
+  sortButtonActive: {
+    backgroundColor: colors.primary, borderColor: colors.primary,
+    shadowColor: colors.primaryDark, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.22, shadowRadius: 5, elevation: 2,
+  },
 });

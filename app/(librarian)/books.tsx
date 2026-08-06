@@ -1,22 +1,94 @@
-import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Text, 
-  FlatList, 
-  TouchableOpacity, 
-  Modal, 
-  TextInput, 
-  ScrollView, 
-  ActivityIndicator, 
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
   Alert,
-  Image 
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { BookOpen, Library, Trash2, Sparkles } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
-import { supabase } from "@/lib/supabaseClient"; 
-import { useAuthStore } from "@/store/authStore";
-import { uploadBookCover } from "@/lib/auth-helpers";
+import { useFocusEffect } from "@react-navigation/native";
+import { supabase } from "@/lib/supabaseClient";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+// ============================================================
+// Design tokens — soft neumorphic base + glass surfaces
+// (shared visual language with the rest of the app)
+// ============================================================
+const colors = {
+  bgBase: "#EEF1F7",
+  bgBaseAlt: "#E6EBF5",
+  glass: "rgba(255,255,255,0.55)",
+  glassStrong: "rgba(255,255,255,0.82)",
+  glassBorder: "rgba(255,255,255,0.7)",
+  glassBorderSoft: "rgba(255,255,255,0.45)",
+
+  primary: "#164a2d",
+  primaryDark: "#0d2e1c",
+  primarySoft: "#1f6b40",
+
+  danger: "#DC2626",
+  dangerGlass: "rgba(220,38,38,0.08)",
+  dangerBorder: "rgba(220,38,38,0.18)",
+
+  success: "#166534",
+  successGlass: "rgba(22,101,52,0.10)",
+  successBorder: "rgba(22,101,52,0.22)",
+
+  textPrimary: "#1C1A16",
+  textSecondary: "#6B7280",
+  textMuted: "#9CA3AF",
+
+  shadowDark: "#AEB8CC",
+
+  white: "#ffffff",
+};
+
+// Faux glass surface — layered translucency + a sheen gradient, no real
+// backdrop blur (real blur renders inconsistently across platforms and
+// Expo Go, and looks muddy over busy/scrolling content).
+function GlassSurface({
+  tint = "light",
+  style,
+  children,
+}: {
+  tint?: "light" | "dark";
+  style?: any;
+  children?: React.ReactNode;
+}) {
+  const isDark = tint === "dark";
+  const baseColor = isDark ? "rgba(20,18,14,0.72)" : colors.glassStrong;
+  const sheenColors = isDark
+    ? (["rgba(255,255,255,0.05)", "rgba(255,255,255,0)"] as const)
+    : (["rgba(255,255,255,0.55)", "rgba(255,255,255,0)"] as const);
+
+  return (
+    <View style={[style, { backgroundColor: baseColor, overflow: "hidden" }]}>
+      <LinearGradient
+        colors={sheenColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.7 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      {children}
+    </View>
+  );
+}
+
+// Base width used to derive a gentle responsive scale factor — same
+// technique as the tab bar: clamp so small phones shrink a little and
+// large phones/tablets don't blow sizing out.
+const BASE_WIDTH = 375;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 interface Book {
   id: string;
@@ -33,21 +105,27 @@ interface Book {
 
 export default function BooksScreen() {
   const router = useRouter();
-  const profile = useAuthStore((s) => s.profile);
+  const { width } = useWindowDimensions();
+  const isTablet = width >= 768;
+  const numColumns = isTablet ? 2 : 1;
+  const scale = clamp(width / BASE_WIDTH, 0.9, 1.12);
+
+  const responsive = useMemo(
+    () => ({
+      coverWidth: Math.round(92 * scale),
+      coverHeight: Math.round(122 * scale),
+      emptyIconSize: Math.round(96 * scale),
+    }),
+    [scale]
+  );
+
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
-  // Form state
-  const [bookId, setBookId] = useState("");
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [category, setCategory] = useState("");
-  const [publisher, setPublisher] = useState("");
-  const [isbn, setIsbn] = useState("");
-  const [totalCopies, setTotalCopies] = useState("1");
-  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const availableTotal = useMemo(
+    () => books.reduce((sum, b) => sum + (b.available_copies ?? 0), 0),
+    [books]
+  );
 
   const fetchBooks = async () => {
     try {
@@ -70,73 +148,14 @@ export default function BooksScreen() {
     fetchBooks();
   }, []);
 
-  const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
-    if (!permissionResult.granted) {
-      Alert.alert("Permission Required", "Permission to access camera roll is required!");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setCoverUri(result.assets[0].uri);
-    }
-  };
-
-  const handleAddBook = async () => {
-    if (!bookId.trim() || !title.trim() || !author.trim()) {
-      Alert.alert("Validation Error", "Please fill in Book ID, Title, and Author.");
-      return;
-    }
-
-    const copies = parseInt(totalCopies, 10);
-    if (isNaN(copies) || copies < 1) {
-      Alert.alert("Validation Error", "Total copies must be at least 1.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      const { data: newBook, error: insertError } = await supabase
-        .from("books")
-        .insert({
-          book_id: bookId.trim(),
-          title: title.trim(),
-          author: author.trim(),
-          category: category.trim() || null,
-          publisher: publisher.trim() || null,
-          isbn: isbn.trim() || null,
-          total_copies: copies,
-          available_copies: copies, 
-          created_by: profile?.id,
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      if (coverUri && newBook) {
-        await uploadBookCover(newBook.id, newBook.book_id, coverUri);
-      }
-
-      Alert.alert("Success", "Book added successfully!");
-      setModalVisible(false);
-      resetForm();
+  // Books are now added from the shared Add modal in the tab bar, which
+  // lives outside this screen — refetch whenever this tab regains focus
+  // so newly added titles show up without a manual pull-to-refresh.
+  useFocusEffect(
+    React.useCallback(() => {
       fetchBooks();
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to add book");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    }, [])
+  );
 
   const handleDeleteBook = (book: Book) => {
     Alert.alert(
@@ -165,7 +184,7 @@ export default function BooksScreen() {
               if (error) throw error;
 
               setBooks((prev) => prev.filter((b) => b.id !== book.id));
-              Alert.alert("Success", "Book deleted successfully.");
+              Alert.alert("Deleted", "Book removed from catalog.");
             } catch (error: any) {
               Alert.alert("Error", error.message || "Failed to delete book.");
             }
@@ -175,222 +194,262 @@ export default function BooksScreen() {
     );
   };
 
-  const resetForm = () => {
-    setBookId("");
-    setTitle("");
-    setAuthor("");
-    setCategory("");
-    setPublisher("");
-    setIsbn("");
-    setTotalCopies("1");
-    setCoverUri(null);
-  };
-
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#164a2d" />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <LinearGradient colors={[colors.bgBase, colors.bgBaseAlt]} style={StyleSheet.absoluteFill} />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50 p-4">
-      {books.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-6">
-          <Ionicons name="book-outline" size={64} color="#9ca3af" />
-          <Text className="mt-4 text-xl font-bold text-gray-800">No Books Found</Text>
-          <Text className="mt-1 text-center text-sm text-gray-500">
-            Your library catalog is empty. Start by adding your first book.
-          </Text>
-          <TouchableOpacity
-            onPress={() => setModalVisible(true)}
-            className="mt-6 flex-row items-center rounded-xl bg-[#164a2d] px-6 py-3 shadow-md"
-          >
-            <Ionicons name="add" size={20} color="#ffffff" />
-            <Text className="ml-2 font-semibold text-white">Add Books</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <View className="mb-4 flex-row items-center justify-between">
-            <Text className="text-lg font-bold text-gray-800">
-              Library Catalog ({books.length})
-            </Text>
-            <TouchableOpacity
-              onPress={() => setModalVisible(true)}
-              className="flex-row items-center rounded-lg bg-[#164a2d] px-4 py-2"
-            >
-              <Ionicons name="add" size={18} color="#ffffff" />
-              <Text className="ml-1 text-sm font-semibold text-white">Add Book</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <LinearGradient colors={[colors.bgBase, colors.bgBaseAlt]} style={StyleSheet.absoluteFill} />
+
+      {/* Header — distinct "floating glass card" style, deliberately
+          different from the dashboard's own header treatment. */}
+      <View style={[styles.headerWrap, isTablet && styles.headerWrapTablet]}>
+        <GlassSurface tint="light" style={styles.headerCard}>
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerIconBadge}>
+              <Library size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.headerTitle}>Library Catalog</Text>
+              <Text style={styles.headerSubtitle}>Browse and manage every title on record</Text>
+            </View>
           </View>
 
+          <View style={styles.headerStatsRow}>
+            <View style={styles.statChip}>
+              <BookOpen size={13} color={colors.primary} />
+              <Text style={styles.statChipText}>
+                {books.length} {books.length === 1 ? "Books" : "Books"}
+              </Text>
+            </View>
+            <View style={[styles.statChip, styles.statChipSuccess]}>
+              <Sparkles size={13} color={colors.success} />
+              <Text style={[styles.statChipText, { color: colors.success }]}>
+                {availableTotal} Available
+              </Text>
+            </View>
+          </View>
+        </GlassSurface>
+      </View>
+
+      <View style={[styles.bodyWrapper, isTablet && styles.bodyWrapperTablet]}>
+        {books.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={[styles.emptyIconWrap, { width: responsive.emptyIconSize, height: responsive.emptyIconSize, borderRadius: responsive.emptyIconSize / 2 }]}>
+              <Library size={Math.round(responsive.emptyIconSize * 0.42)} color={colors.textMuted} />
+            </View>
+            <Text style={styles.emptyTitle}>No Books Yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Your library catalog is empty. Tap the + button below to add your first book.
+            </Text>
+          </View>
+        ) : (
           <FlatList
+            key={numColumns}
             data={books}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity 
-                onPress={() => router.push({ pathname: "/book-detail", params: { id: item.id } })}
-                className="mb-3 flex-row rounded-xl bg-white p-3 shadow-sm border border-gray-100 items-center justify-between"
-              >
-                <View className="flex-row items-center flex-1 pr-2">
-                  {item.cover_image_url ? (
-                    <Image 
-                      source={{ uri: item.cover_image_url }} 
-                      className="h-24 w-16 rounded-lg bg-gray-200 mr-3" 
-                    />
-                  ) : (
-                    <View className="h-24 w-16 rounded-lg bg-gray-100 mr-3 items-center justify-center">
-                      <Ionicons name="image-outline" size={24} color="#9ca3af" />
-                    </View>
-                  )}
-
-                  <View className="flex-1 pr-2">
-                    <Text className="text-base font-bold text-gray-900" numberOfLines={1}>{item.title}</Text>
-                    <Text className="text-sm text-gray-600 mt-0.5" numberOfLines={1}>Author: {item.author}</Text>
-                    <Text className="text-xs text-gray-400 mt-1">Code: {item.book_id}</Text>
-                    {item.category && (
-                      <Text className="text-xs text-[#164a2d] font-medium mt-1">{item.category}</Text>
-                    )}
-                  </View>
-                </View>
-
-                <View className="items-end flex-row space-x-2">
-                  <View className="rounded-full bg-green-50 px-2.5 py-1 mr-2">
-                    <Text className="text-xs font-medium text-[#164a2d]">
-                      {item.available_copies}/{item.total_copies}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity 
-                    onPress={(e) => {
-                      e.stopPropagation(); // Prevent opening detail view when clicking delete
-                      handleDeleteBook(item);
-                    }}
-                    className="p-2 rounded-lg bg-red-50"
-                  >
-                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            )}
+            numColumns={numColumns}
+            columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <Text style={styles.listHeaderText}>{books.length} Books in Catalog</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={[styles.cardOuter, numColumns > 1 && styles.cardOuterGrid]}>
+                <TouchableOpacity
+                  onPress={() => router.push({ pathname: "/book-detail", params: { id: item.id } })}
+                  activeOpacity={0.85}
+                >
+                  <GlassSurface tint="light" style={styles.card}>
+                    <View style={styles.cardRow}>
+                      {item.cover_image_url ? (
+                        <Image
+                          source={{ uri: item.cover_image_url }}
+                          style={[styles.cover, { width: responsive.coverWidth, height: responsive.coverHeight }]}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[styles.coverPlaceholder, { width: responsive.coverWidth, height: responsive.coverHeight }]}>
+                          <BookOpen size={28} color={colors.textMuted} />
+                        </View>
+                      )}
+
+                      <View style={styles.cardInfo}>
+                        <View style={styles.cardTopRow}>
+                          <View style={{ flex: 1, paddingRight: 8 }}>
+                            <Text style={styles.bookTitle} numberOfLines={2}>
+                              {item.title}
+                            </Text>
+                            <Text style={styles.bookAuthor} numberOfLines={1}>
+                              {item.author}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteBook(item)}
+                            style={styles.deleteButton}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          >
+                            <Trash2 size={14} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.badgeRow}>
+                          <View style={styles.badgesLeft}>
+                            <View style={styles.idBadge}>
+                              <Text style={styles.idBadgeText}>{item.book_id}</Text>
+                            </View>
+                            {item.category && (
+                              <View style={styles.categoryBadge}>
+                                <Text style={styles.categoryBadgeText}>{item.category}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <View style={styles.availabilityBadge}>
+                            <View style={styles.availabilityDot} />
+                            <Text style={styles.availabilityText}>
+                              {item.available_copies}/{item.total_copies}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </GlassSurface>
+                </TouchableOpacity>
+              </View>
+            )}
           />
-        </>
-      )}
-
-      {/* Add Book Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="max-h-[90%] rounded-t-3xl bg-white p-6 shadow-xl">
-            <View className="flex-row items-center justify-between border-b border-gray-100 pb-4">
-              <Text className="text-xl font-bold text-gray-900">Add New Book</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#4b5563" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView className="py-4" showsVerticalScrollIndicator={false}>
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Book Cover Image</Text>
-              <TouchableOpacity 
-                onPress={pickImage}
-                className="mb-4 h-40 w-full rounded-xl border border-dashed border-gray-300 bg-gray-50 items-center justify-center overflow-hidden"
-              >
-                {coverUri ? (
-                  <Image source={{ uri: coverUri }} className="h-full w-full" />
-                ) : (
-                  <View className="items-center">
-                    <Ionicons name="camera-outline" size={32} color="#9ca3af" />
-                    <Text className="mt-2 text-xs text-gray-500 font-medium">Tap to select cover image</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Book ID / QR Code *</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="e.g. BK-00123"
-                placeholderTextColor="#9ca3af"
-                value={bookId}
-                onChangeText={setBookId}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Title *</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="Book Title"
-                placeholderTextColor="#9ca3af"
-                value={title}
-                onChangeText={setTitle}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Author *</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="Author Name"
-                placeholderTextColor="#9ca3af"
-                value={author}
-                onChangeText={setAuthor}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Category</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="e.g. Science, Fiction"
-                placeholderTextColor="#9ca3af"
-                value={category}
-                onChangeText={setCategory}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Publisher</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="Publisher Name"
-                placeholderTextColor="#9ca3af"
-                value={publisher}
-                onChangeText={setPublisher}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">ISBN</Text>
-              <TextInput
-                className="mb-3 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="ISBN Number"
-                placeholderTextColor="#9ca3af"
-                value={isbn}
-                onChangeText={setIsbn}
-              />
-
-              <Text className="mb-1 text-xs font-semibold text-gray-600">Total Copies *</Text>
-              <TextInput
-                className="mb-6 rounded-xl border border-gray-200 p-3 text-gray-900 bg-gray-50"
-                placeholder="1"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-                value={totalCopies}
-                onChangeText={setTotalCopies}
-              />
-
-              <TouchableOpacity
-                onPress={handleAddBook}
-                disabled={submitting}
-                className="items-center rounded-xl bg-[#164a2d] py-4 shadow-md mb-6"
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text className="font-bold text-white">Save Book</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
+
+// --- Screen Styles ---
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.bgBase },
+  centerContainer: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+  // New header: a single floating glass card instead of a full-bleed
+  // gradient banner, so Books reads distinctly from the Dashboard.
+  headerWrap: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  headerWrapTablet: { maxWidth: 720, width: "100%", alignSelf: "center" },
+  headerCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 18,
+    shadowColor: colors.shadowDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  headerTopRow: { flexDirection: "row", alignItems: "center" },
+  headerIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(22,74,45,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(22,74,45,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: colors.textPrimary, letterSpacing: -0.2 },
+  headerSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2, fontWeight: "500" },
+  headerStatsRow: { flexDirection: "row", gap: 8, marginTop: 14 },
+  statChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.bgBase,
+    borderWidth: 1,
+    borderColor: colors.successGlass,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statChipSuccess: { backgroundColor: colors.bgBase, borderColor: colors.successGlass },
+  statChipText: { fontSize: 11.5, fontWeight: "700", color: colors.primary },
+
+  bodyWrapper: { flex: 1, width: "100%" },
+  bodyWrapperTablet: { maxWidth: 720, alignSelf: "center" },
+
+  listContent: { padding: 16, paddingTop: 14, paddingBottom: 40 },
+  listHeaderText: { fontSize: 11, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10 },
+  columnWrapper: { justifyContent: "space-between" },
+
+  cardOuter: {
+    marginBottom: 14,
+    borderRadius: 22,
+    backgroundColor: colors.bgBase,
+    shadowColor: colors.shadowDark,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 9,
+    elevation: 3,
+  },
+  cardOuterGrid: { width: "48.5%" },
+  card: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 12,
+  },
+  cardRow: { flexDirection: "row" },
+  cover: { borderRadius: 16, backgroundColor: "rgba(0,0,0,0.05)" },
+  coverPlaceholder: {
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.5)",
+    borderWidth: 1,
+    borderColor: colors.glassBorderSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardInfo: { flex: 1, marginLeft: 14, justifyContent: "space-between" },
+  cardTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  bookTitle: { fontSize: 13, fontWeight: "700", color: colors.textPrimary, lineHeight: 19 },
+  bookAuthor: { fontSize: 12, color: colors.textSecondary, marginTop: 3 },
+  deleteButton: {
+    padding: 7,
+    borderRadius: 10,
+    backgroundColor: colors.dangerGlass,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    marginTop: -2,
+  },
+
+  badgeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  badgesLeft: { flexDirection: "row", alignItems: "center", flex: 1, flexWrap: "wrap", gap: 6 },
+  idBadge: { backgroundColor: colors.bgBase, borderWidth: 1, borderColor: colors.bgBaseAlt, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  idBadgeText: { fontSize: 10, fontWeight: "700", color: colors.textSecondary, letterSpacing: 0.3 },
+  categoryBadge: { backgroundColor: colors.successGlass, borderWidth: 1, borderColor: colors.successBorder, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  categoryBadgeText: { fontSize: 10, fontWeight: "700", color: colors.success, letterSpacing: 0.3 },
+  availabilityBadge: { flexDirection: "row", alignItems: "center", backgroundColor: colors.successGlass, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
+  availabilityDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success, marginRight: 6 },
+  availabilityText: { fontSize: 11, fontWeight: "700", color: colors.success },
+
+  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  emptyIconWrap: {
+    backgroundColor: colors.bgBase,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    shadowColor: colors.shadowDark,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  emptyTitle: { fontSize: 19, fontWeight: "800", color: colors.textPrimary },
+  emptySubtitle: { marginTop: 8, textAlign: "center", fontSize: 13, color: colors.textSecondary, maxWidth: 280, lineHeight: 19 },
+});

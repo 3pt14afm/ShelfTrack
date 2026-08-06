@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, ActivityIndicator, Image, Alert, TouchableOpacity, StyleSheet } from "react-native";
+import { 
+  View, 
+  Text, 
+  FlatList, 
+  ActivityIndicator, 
+  Image, 
+  Alert, 
+  TouchableOpacity 
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabaseClient";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface BorrowedBook {
   id: string;
@@ -23,11 +32,14 @@ export default function MyBooksScreen() {
   const router = useRouter();
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
+  
   const [books, setBooks] = useState<BorrowedBook[]>([]);
   const [loading, setLoading] = useState(true);
   const [returningId, setReturningId] = useState<string | null>(null);
 
-  useEffect(() => { fetchMyBooks(); }, []);
+  useEffect(() => { 
+    fetchMyBooks(); 
+  }, []);
 
   const fetchMyBooks = async () => {
     if (!session?.user) return;
@@ -37,148 +49,177 @@ export default function MyBooksScreen() {
         .select(`id, borrowed_at, due_date, books ( id, title, author, cover_image_url, book_id, available_copies )`)
         .eq("student_id", session.user.id)
         .eq("status", "borrowed");
+        
       if (error) throw error;
       setBooks(data || []);
-    } catch (err) { console.error(err); } 
-    finally { setLoading(false); }
+    } catch (err) { 
+      console.error(err); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleReturn = async (txId: string, bookId: string, currentCopies: number) => {
     Alert.alert("Return Book", "Are you sure you want to return this book?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Return", style: "destructive",
+        text: "Return", 
+        style: "destructive",
         onPress: async () => {
           setReturningId(txId);
           try {
-            const { error: txError } = await supabase.from("transactions").update({ status: "returned", returned_at: new Date().toISOString() }).eq("id", txId);
+            const { error: txError } = await supabase
+              .from("transactions")
+              .update({ status: "returned", returned_at: new Date().toISOString() })
+              .eq("id", txId);
             if (txError) throw txError;
-            const { error: updateError } = await supabase.from("books").update({ available_copies: currentCopies + 1 }).eq("id", bookId);
+            
+            const { error: updateError } = await supabase
+              .from("books")
+              .update({ available_copies: currentCopies + 1 })
+              .eq("id", bookId);
             if (updateError) throw updateError;
+            
             Alert.alert("Success", "Book returned successfully!");
             fetchMyBooks();
-          } catch (err: any) { Alert.alert("Error", err.message || "Failed to return book."); } 
-          finally { setReturningId(null); }
+          } catch (err: any) { 
+            Alert.alert("Error", err.message || "Failed to return book."); 
+          } finally { 
+            setReturningId(null); 
+          }
         },
       },
     ]);
   };
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const formatDate = (dateString: string) => 
+    new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-  if (loading) return (<View style={styles.centerContainer}><ActivityIndicator size="large" color="#164a2d" /></View>);
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <ActivityIndicator size="large" color="#164a2d" />
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      {/* EXACT SAME GREEN HEADER AS HOME */}
-      <View style={styles.headerContainer}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>My Borrowed Books</Text>
-          <TouchableOpacity onPress={() => router.replace("/profile")} style={styles.profileIconContainer}>
+    <View className="flex-1 bg-slate-50">
+      {/* EXACT SAME GREEN HEADER AS HOME - Refined & Modern */}
+      <SafeAreaView edges={['top']} className="bg-[#164a2d] rounded-b-[32px] pb-6 pt-2 shadow-lg shadow-[#164a2d]/30">
+        <View className="flex-row justify-between items-center px-6 pt-3">
+          <View>
+            <Text className="text-white text-2xl font-extrabold">My Books</Text>
+            <Text className="text-white/70 text-sm font-medium mt-1">
+              {books.length} {books.length === 1 ? "book" : "books"} currently borrowed
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            onPress={() => router.replace("/profile")} 
+            className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/30 bg-white/10"
+          >
             {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.profileImage} />
+              <Image source={{ uri: profile.avatar_url }} className="w-full h-full" resizeMode="cover" />
             ) : (
-              <Ionicons name="person-circle-outline" size={48} color="rgba(255,255,255,0.9)" />
+              <View className="w-full h-full items-center justify-center">
+                <Ionicons name="person" size={24} color="rgba(255,255,255,0.9)" />
+              </View>
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
 
       <FlatList
         data={books}
-        style={{ flex: 1 }}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+        className="flex-1"
+        contentContainerClassName="p-5 pt-6"
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="book-off-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyText}>No borrowed books</Text>
-            <Text style={styles.emptySubtext}>Books you borrow will appear here</Text>
+          <View className="flex-1 items-center justify-center mt-24">
+            <View className="bg-slate-100 p-6 rounded-full mb-5">
+              <Ionicons name="book-outline" size={48} color="#94a3b8" />
+            </View>
+            <Text className="text-lg font-bold text-slate-800">No Active Loans</Text>
+            <Text className="text-sm text-slate-500 mt-2 text-center max-w-xs">
+              You currently have no borrowed books. Visit the library to find something to read!
+            </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={{ flexDirection: "row", flex: 1 }}>
-              {item.books?.cover_image_url ? (
-                <Image source={{ uri: item.books.cover_image_url }} style={styles.cover} resizeMode="cover" />
-              ) : (
-                <View style={styles.coverPlaceholder}><Ionicons name="book-outline" size={24} color="#9ca3af" /></View>
-              )}
-              <View style={{ flex: 1, marginLeft: 12, justifyContent: "center" }}>
-                <Text style={styles.title} numberOfLines={2}>{item.books?.title}</Text>
-                <Text style={styles.author} numberOfLines={1}>{item.books?.author}</Text>
-                <View style={{ flexDirection: "row", marginTop: 8 }}>
-                  <View style={styles.dateBox}>
-                    <Text style={styles.dateLabel}>Borrowed</Text>
-                    <Text style={styles.dateValue}>{formatDate(item.borrowed_at)}</Text>
+        renderItem={({ item }) => {
+          const isOverdue = new Date(item.due_date) < new Date();
+          
+          return (
+            <View className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm mb-4">
+              <View className="flex-row">
+                {/* Book Cover */}
+                {item.books?.cover_image_url ? (
+                  <Image 
+                    source={{ uri: item.books.cover_image_url }} 
+                    className="h-32 w-24 rounded-xl bg-slate-200" 
+                    resizeMode="cover" 
+                  />
+                ) : (
+                  <View className="h-32 w-24 rounded-xl bg-slate-100 items-center justify-center">
+                    <Ionicons name="book-outline" size={32} color="#cbd5e1" />
                   </View>
-                  <View style={[styles.dateBox, { marginLeft: 12 }]}>
-                    <Text style={styles.dateLabel}>Due Date</Text>
-                    <Text style={[styles.dateValue, { color: "#d97706" }]}>{formatDate(item.due_date)}</Text>
+                )}
+
+                {/* Book Info */}
+                <View className="flex-1 pl-4">
+                  <Text className="text-base font-bold text-slate-900 leading-tight" numberOfLines={2}>
+                    {item.books?.title}
+                  </Text>
+                  <Text className="text-sm text-slate-500 mt-1" numberOfLines={1}>
+                    {item.books?.author}
+                  </Text>
+
+                  {/* Dates */}
+                  <View className="flex-row mt-3 space-x-2">
+                    <View className="bg-slate-50 border border-slate-100 px-2.5 py-1.5 rounded-lg flex-1">
+                      <Text className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        Borrowed
+                      </Text>
+                      <Text className="text-xs text-slate-700 font-semibold mt-0.5">
+                        {formatDate(item.borrowed_at)}
+                      </Text>
+                    </View>
+                    
+                    <View className={`px-2.5 py-1.5 rounded-lg flex-1 border ${isOverdue ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+                      <Text className={`text-[10px] font-bold uppercase tracking-wider ${isOverdue ? 'text-red-400' : 'text-amber-500'}`}>
+                        {isOverdue ? "Overdue" : "Due Date"}
+                      </Text>
+                      <Text className={`text-xs font-semibold mt-0.5 ${isOverdue ? 'text-red-700' : 'text-amber-700'}`}>
+                        {formatDate(item.due_date)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
+
+              {/* Return Button */}
+              <TouchableOpacity
+                className={`mt-4 py-3 rounded-xl flex-row justify-center items-center ${
+                  returningId === item.id ? "bg-slate-300" : "bg-[#164a2d] shadow-sm shadow-[#164a2d]/20"
+                }`}
+                onPress={() => handleReturn(item.id, item.books.id, item.books.available_copies)}
+                disabled={returningId === item.id}
+                activeOpacity={0.8}
+              >
+                {returningId === item.id ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="arrow-undo-circle-outline" size={18} color="white" />
+                    <Text className="text-white font-bold text-sm ml-2">Return Book</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.returnButton, returningId === item.id && styles.returnButtonDisabled]}
-              onPress={() => handleReturn(item.id, item.books.id, item.books.available_copies)}
-              disabled={returningId === item.id}
-              activeOpacity={0.8}
-            >
-              {returningId === item.id ? <ActivityIndicator size="small" color="white" /> : <Text style={styles.returnButtonText}>Return</Text>}
-            </TouchableOpacity>
-          </View>
-        )}
+          );
+        }}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
-  centerContainer: { flex: 1, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
-  
-  // --- EXACT GREEN HEADER STYLES ---
-  headerContainer: {
-    backgroundColor: "#164a2d",
-    paddingTop: 40,
-    paddingBottom: 10,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    marginBottom: 8,
-    shadowColor: "#164a2d",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  headerTitle: { color: "white", fontSize: 24, fontWeight: "800" },
-  profileIconContainer: { width: 48, height: 48, borderRadius: 24, overflow: 'hidden', borderWidth: 2, borderColor: "rgba(255,255,255,0.3)" },
-  profileImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-
-  // --- LIST STYLES ---
-  emptyContainer: { alignItems: "center", justifyContent: "center", marginTop: 100 },
-  emptyText: { color: "#6b7280", marginTop: 16, fontSize: 16, fontWeight: "600" },
-  emptySubtext: { color: "#9ca3af", marginTop: 4, fontSize: 13 },
-  card: {
-    backgroundColor: "white", padding: 16, borderRadius: 16, marginBottom: 16, borderWidth: 1, borderColor: "#f3f4f6",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 3,
-    justifyContent: "space-between",
-  },
-  cover: { width: 80, height: 110, borderRadius: 8, backgroundColor: "#e5e7eb" },
-  coverPlaceholder: { width: 80, height: 110, borderRadius: 8, backgroundColor: "#f3f4f6", justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  author: { fontSize: 13, color: "#6b7280", marginTop: 2 },
-  dateBox: { backgroundColor: "#f9fafb", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  dateLabel: { fontSize: 10, color: "#9ca3af", textTransform: "uppercase" },
-  dateValue: { fontSize: 12, color: "#374151", fontWeight: "600", marginTop: 2 },
-  returnButton: { backgroundColor: "#164a2d", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, justifyContent: "center", marginTop: 12, shadowColor: "#164a2d", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 3 },
-  returnButtonDisabled: { backgroundColor: "#9ca3af" },
-  returnButtonText: { color: "white", fontWeight: "700", fontSize: 14 },
-});

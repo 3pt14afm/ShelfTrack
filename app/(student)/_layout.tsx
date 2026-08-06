@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/store/authStore";
 
@@ -17,41 +17,48 @@ export default function StudentLayout() {
   return (
     <Tabs
       screenOptions={{
-        // HIDE native header for ALL tabs. We will build custom ones inside the files.
-        headerShown: false, 
+        headerShown: false,
         tabBarActiveTintColor: "#164a2d",
-        tabBarInactiveTintColor: "#9ca3af",
+        tabBarInactiveTintColor: "#9CA3AF",
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
-      <Tabs.Screen 
-        name="index" 
-        options={{ 
+      <Tabs.Screen
+        name="index"
+        options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />
-        }} 
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={18} color={color} />
+          ),
+        }}
       />
-      <Tabs.Screen 
-        name="history" 
-        options={{ 
+      <Tabs.Screen
+        name="history"
+        options={{
           title: "History",
-          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />
-        }} 
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "time" : "time-outline"} size={18} color={color} />
+          ),
+        }}
       />
-      <Tabs.Screen 
-        name="my-books" 
-        options={{ 
+      <Tabs.Screen
+        name="my-books"
+        options={{
           title: "My Books",
-          tabBarIcon: ({ color, size }) => <Ionicons name="book-outline" size={size} color={color} />
-        }} 
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "book" : "book-outline"} size={18} color={color} />
+          ),
+        }}
       />
-      <Tabs.Screen 
-        name="profile" 
-        options={{ 
+      <Tabs.Screen
+        name="profile"
+        options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />
-        }} 
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={18} color={color} />
+          ),
+        }}
       />
     </Tabs>
   );
@@ -59,20 +66,31 @@ export default function StudentLayout() {
 
 const styles = StyleSheet.create({
   centerContainer: {
-    flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "#FAFAFA",
     justifyContent: "center",
     alignItems: "center",
   },
   tabBar: {
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
-    paddingBottom: 5,
-    height: 60,
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 28 : 16,
+    left: 20,
+    right: 20,
+    height: 50,
+    borderRadius: 20,
+    marginHorizontal: 14,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 0,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.04)", 
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 6, // Clean shadow on Android
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
+    marginTop: -3
   },
 });
