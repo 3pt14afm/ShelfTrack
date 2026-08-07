@@ -1,13 +1,13 @@
 {
   "expo": {
     "name": "ShelfTrack",
-    "slug": "ShelfTrack",
+    "slug": "shelftrack",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/SHELFTRACK.png",
+    "icon": "./assets/images/shelftrackicon.png",
     "scheme": "shelftrack",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -41,31 +41,9 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/SHELFTRACKpng",
+          "image": "./assets/images/SHELFTRACK.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "dark": {
-            "image": "./assets/images/SHELFTRACK.png",
-            "backgroundColor": "#ffffff"
-          },
-          "ios": {
-            "backgroundColor": "#ffffff",
-            "image": "./assets/images/SHELFTRACK.png",
-            "resizeMode": "contain",
-            "dark": {
-              "image": "./assets/images/SHELFTRACK.png",
-              "backgroundColor": "#ffffff"
-            }
-          },
-          "android": {
-            "backgroundColor": "#ffffff",
-            "image": "./assets/images/SHELFTRACK.png",
-            "imageWidth": 200,
-            "dark": {
-              "image": "./assets/images/SHELFTRACK.png",
-              "backgroundColor": "#ffffff"
-            }
-          }
+          "resizeMode": "contain"
         }
       ],
       [
@@ -81,8 +59,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
