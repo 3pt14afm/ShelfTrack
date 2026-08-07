@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/store/authStore";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -75,6 +76,7 @@ const FILTERS: { key: StatusFilter; label: string; icon: React.ReactNode }[] = [
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -251,11 +253,14 @@ export default function HistoryScreen() {
         </GlassSurface>
       </View>
 
-      <FlatList
+      <Text className="flex text-center text-xs text-slate-500 mt-64">This feature is currently under active development.</Text>
+
+      {/* <FlatList
         data={displayedTransactions}
         keyExtractor={(item) => item.id}
         className="flex-1"
         contentContainerClassName="p-5 pt-4"
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 20 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center mt-24">
@@ -277,7 +282,7 @@ export default function HistoryScreen() {
 
           return (
             <View className="flex-row items-start bg-white rounded-2xl p-3 border border-slate-200 shadow-sm mb-3">
-              {/* Book Cover */}
+              -------------- Book Cover ---------------
               {item.books?.cover_image_url ? (
                 <Image
                   source={{ uri: item.books.cover_image_url }}
@@ -290,7 +295,7 @@ export default function HistoryScreen() {
                 </View>
               )}
 
-              {/* Book Info */}
+              --------------- Book Info ---------------
               <View className="flex-1 pl-3 pr-2">
                 <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
                   {item.books?.title || "Unknown Book"}
@@ -299,7 +304,7 @@ export default function HistoryScreen() {
                   {item.books?.author || "Unknown Author"}
                 </Text>
 
-                {/* Date Stack */}
+                ----------------- Date Stack -----------------
                 <View className="mt-2 space-y-1.5">
                   <View className="flex-row items-center">
                     <Ionicons name="calendar-outline" size={12} color="#94a3b8" />
@@ -326,7 +331,7 @@ export default function HistoryScreen() {
                 </View>
               </View>
 
-              {/* Status Badge — normal flow, own column, so it never overlaps the title */}
+             ----------------- Status Badge — normal flow, own column, so it never overlaps the title ----------
               <View
                 className={`px-2.5 py-1 rounded-full border shrink-0 ${isReturned ? "bg-emerald-50 border-emerald-100" : "bg-amber-50 border-amber-100"
                   }`}
@@ -341,13 +346,13 @@ export default function HistoryScreen() {
             </View>
           );
         }}
-      />
+      /> */}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  toolbarWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
+  toolbarWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, backgroundColor: 'transparent' },
   toolbarCard: {
     borderRadius: 20,
     borderWidth: 1,

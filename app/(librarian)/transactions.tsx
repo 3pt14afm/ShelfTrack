@@ -192,15 +192,17 @@ export default function TransactionsScreen() {
         </Card>
       </View>
 
+      <Text className="text-center text-xs text-slate-500 mt-72">This feature is currently under active development</Text>
+
       {/* Records count */}
-      <View style={styles.recordsRow}>
+      {/* <View style={styles.recordsRow}>
         <Text style={styles.recordsLabel}>
           {filtered.length} {filtered.length === 1 ? "record" : "records"}
         </Text>
-      </View>
+      </View> */}
 
       {/* List */}
-      {filtered.length === 0 ? (
+      {/* {filtered.length === 0 ? (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
@@ -244,7 +246,7 @@ export default function TransactionsScreen() {
             ItemSeparatorComponent={() => <View style={styles.txRowDivider} />}
           />
         </View>
-      )}
+      )} */}
     </SafeAreaView>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabaseClient";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +31,7 @@ interface BorrowedBook {
 
 export default function MyBooksScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const session = useAuthStore((s) => s.session);
   const profile = useAuthStore((s) => s.profile);
   
@@ -135,6 +137,7 @@ export default function MyBooksScreen() {
         keyExtractor={(item) => item.id}
         className="flex-1"
         contentContainerClassName="p-5 pt-6"
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 20 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center mt-24">

@@ -261,22 +261,24 @@ export default function StudentsScreen() {
             <View style={styles.statChip}>
               <Users size={13} color={colors.primary} />
               <Text style={styles.statChipText}>
-                {visibleStudents.length} {visibleStudents.length === 1 ? "Student" : "Students"}
+                {/* {visibleStudents.length} {visibleStudents.length === 1 ? "Student" : "Students"} */} No. of students
               </Text>
             </View>
             <View style={[styles.statChip, styles.statChipSuccess]}>
               <BookOpenCheck size={13} color={colors.success} />
               <Text style={[styles.statChipText, { color: colors.success }]}>
-                {borrowedIds.size} Borrowed
+                {/* {borrowedIds.size} Borrowed */} No. of books borrowed
               </Text>
             </View>
           </View>
         </GlassSurface>
       </View>
 
+      <Text className="flex text-center text-xs text-slate-500 mt-72">This feature is currently under active development.</Text>
+
       {/* Toolbar — search, borrow filter, and sort — sits below the header
           as its own glass surface. */}
-      <View style={[styles.toolbarWrap, isTablet && styles.headerWrapTablet]}>
+      {/* <View style={[styles.toolbarWrap, isTablet && styles.headerWrapTablet]}>
         <GlassSurface tint="light" style={styles.toolbarCard}>
           <View style={styles.searchBar}>
             <Search size={14} color={colors.textMuted} />
@@ -328,9 +330,9 @@ export default function StudentsScreen() {
             </TouchableOpacity>
           </View>
         </GlassSurface>
-      </View>
+      </View> */}
 
-      <View style={[styles.bodyWrapper, isTablet && styles.bodyWrapperTablet]}>
+      {/* <View style={[styles.bodyWrapper, isTablet && styles.bodyWrapperTablet]}>
         {loading ? (
           <View style={styles.centerContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -371,7 +373,6 @@ export default function StudentsScreen() {
                 <View style={styles.cardOuter}>
                   <GlassSurface tint="light" style={styles.card}>
                     <View style={styles.cardRow}>
-                      {/* Avatar */}
                       <View style={[styles.avatar, { backgroundColor: avatarColor + "22", borderColor: avatarColor + "33" }]}>
                         {item.full_name ? (
                           <Text style={[styles.avatarText, { color: avatarColor }]}>
@@ -382,7 +383,6 @@ export default function StudentsScreen() {
                         )}
                       </View>
 
-                      {/* Info */}
                       <View style={styles.cardInfo}>
                         <Text style={styles.studentName} numberOfLines={1}>
                           {item.full_name || "Account Not Set Up"}
@@ -397,7 +397,6 @@ export default function StudentsScreen() {
                         )}
                       </View>
 
-                      {/* Right column: borrowed top, reset bottom */}
                       <View style={styles.rightColumn}>
                         {hasBorrowed ? (
                           <View style={styles.borrowedBadge}>
@@ -431,7 +430,7 @@ export default function StudentsScreen() {
             }}
           />
         )}
-      </View>
+      </View> */}
     </SafeAreaView>
   );
 }

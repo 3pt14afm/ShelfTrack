@@ -592,45 +592,46 @@ function AddItemModal({ visible, onClose }: { visible: boolean; onClose: () => v
                 </TouchableOpacity>
               </>
             ) : (
-              <>
-                <Text style={modalStyles.label}>12-Digit Student ID</Text>
-                <TextInput
-                  style={modalStyles.input}
-                  placeholder="e.g. 202312345678"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="number-pad"
-                  maxLength={12}
-                  value={newStudentId}
-                  onChangeText={setNewStudentId}
-                />
+              <Text className="h-48 text-xs text-slate-500 text-center mt-32">This feature is currently under active development</Text>
+              // <>
+              //   <Text style={modalStyles.label}>12-Digit Student ID</Text>
+              //   <TextInput
+              //     style={modalStyles.input}
+              //     placeholder="e.g. 202312345678"
+              //     placeholderTextColor={colors.textMuted}
+              //     keyboardType="number-pad"
+              //     maxLength={12}
+              //     value={newStudentId}
+              //     onChangeText={setNewStudentId}
+              //   />
 
-                <View style={modalStyles.infoBox}>
-                  <Text style={modalStyles.infoBoxText}>
-                    The default password will be "password123". The student will be required to
-                    change it upon their first login.
-                  </Text>
-                </View>
+              //   <View style={modalStyles.infoBox}>
+              //     <Text style={modalStyles.infoBoxText}>
+              //       The default password will be "password123". The student will be required to
+              //       change it upon their first login.
+              //     </Text>
+              //   </View>
 
-                <TouchableOpacity
-                  onPress={handleAddStudent}
-                  disabled={creatingStudent || newStudentId.length !== 12}
-                  style={[
-                    modalStyles.submitButton,
-                    (creatingStudent || newStudentId.length !== 12) &&
-                      modalStyles.submitButtonDisabled,
-                  ]}
-                  activeOpacity={0.88}
-                >
-                  {creatingStudent ? (
-                    <ActivityIndicator color={colors.white} />
-                  ) : (
-                    <>
-                      <UserPlus size={14} color={colors.white} />
-                      <Text style={modalStyles.submitButtonText}>Create Student</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
+              //   <TouchableOpacity
+              //     onPress={handleAddStudent}
+              //     disabled={creatingStudent || newStudentId.length !== 12}
+              //     style={[
+              //       modalStyles.submitButton,
+              //       (creatingStudent || newStudentId.length !== 12) &&
+              //         modalStyles.submitButtonDisabled,
+              //     ]}
+              //     activeOpacity={0.88}
+              //   >
+              //     {creatingStudent ? (
+              //       <ActivityIndicator color={colors.white} />
+              //     ) : (
+              //       <>
+              //         <UserPlus size={14} color={colors.white} />
+              //         <Text style={modalStyles.submitButtonText}>Create Student</Text>
+              //       </>
+              //     )}
+              //   </TouchableOpacity>
+              // </>
             )}
           </ScrollView>
         </GlassSurface>

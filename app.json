@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "shelftrack",
-    "slug": "shelftrack",
+    "name": "ShelfTrack",
+    "slug": "ShelfTrack",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/SHELFTRACK.png",
@@ -14,7 +14,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/images/SHELFTRACK.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
@@ -46,7 +46,7 @@
           "resizeMode": "contain",
           "dark": {
             "image": "./assets/images/SHELFTRACK.png",
-            "backgroundColor": "#000000"
+            "backgroundColor": "#ffffff"
           },
           "ios": {
             "backgroundColor": "#ffffff",
@@ -54,7 +54,7 @@
             "resizeMode": "contain",
             "dark": {
               "image": "./assets/images/SHELFTRACK.png",
-              "backgroundColor": "#000000"
+              "backgroundColor": "#ffffff"
             }
           },
           "android": {
@@ -63,7 +63,7 @@
             "imageWidth": 200,
             "dark": {
               "image": "./assets/images/SHELFTRACK.png",
-              "backgroundColor": "#000000"
+              "backgroundColor": "#ffffff"
             }
           }
         }
